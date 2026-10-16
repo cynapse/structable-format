@@ -1,10 +1,10 @@
 # Structable file format specification
 
-A Structable Document is a fusion of CSV and Markdown: a typed table in `data.csv`, Markdown rowdocs for every row, each its own file under `Rowdocs/`, and saved views and metrics, in one folder that Finder shows as one file. This specification sets out the package's files, their rules and how values are stored. Where it names a source path, that's the code that carries the rule.
+A Structable Document is a fusion of CSV and Markdown: a typed table in `data.csv`, Markdown rowdocs for every row, each its own file under `Rowdocs/`, and saved views and metrics, in one folder that Finder shows as one file. This specification sets out the package's files, their rules and how values are stored.
 
 ## Document Structure
 
-Each Structable document is a macOS package:
+Each Structable Document is a macOS package:
 
 ```text
 Project Tracker.structable/
@@ -23,7 +23,7 @@ Project Tracker.structable/
 └── AGENTS.md                   # optional generated package guide
 ```
 
-`README.md`, `manifest.json`, `schema.json`, `data.csv`, `views.json`, `Rowdocs/*`, and `Metrics/*/config.json` are the native package files. `AGENTS.md` is generated helper guidance for external agents and does not mirror live document structure. When the detached `structable` tool is available, it should be preferred for invariant-sensitive reads and writes because it preserves package rules and returns structured JSON for automation.
+`README.md`, `manifest.json`, `schema.json`, `data.csv`, `views.json`, `Rowdocs/*`, and `Metrics/*/config.json` are the native package files. `AGENTS.md` is generated helper guidance for external agents and does not mirror live document structure. When the Structable tool is available, prefer it for invariant-sensitive reads and writes because it preserves package rules and returns structured JSON for automation.
 
 **Preserved members are carried forward.** Structable determines ownership from each normalized package-relative path and member kind. Canonical files and reserved namespaces are Structable-managed; every member classified as preserved is carried through a save unchanged, including hidden members and preserved leaves inside the mixed `Metrics/` namespace. Three categories are deliberately discarded: the retired top-level `Skills` member or tree, regular `.DS_Store` files at any depth, and regular writer-scratch files matching `.<name>.<UUID>.tmp` at any depth. The two filename patterns apply only to regular files; a same-named directory is not discarded on that basis. Structable never interprets preserved members; it only refuses to destroy them.
 
@@ -35,26 +35,26 @@ Project Tracker.structable/
   "appVersion": "1.0.0",
   "createdAt": "2025-01-22T10:30:00Z",
   "modifiedAt": "2025-01-22T14:45:00Z",
-  "documentId": "uuid-here",
+  "documentId": "F81D4FAE-7DEC-11D0-A765-00A0C91E6BF6",
   "rowArchetype": {
-    "singular": "Contact",
-    "plural": "Contacts"
+    "singular": "Task",
+    "plural": "Tasks"
   },
   "lastWriter": {
     "kind": "app",
     "version": "1.0.0",
-    "recap": "Added 3 Contacts to Team CRM"
+    "recap": "Added 3 Tasks to Project Tracker"
   }
 }
 ```
 
-`documentId` is the package's stable identity key: App Intents entities resolve documents by it, and it is the natural key for future document indexing. The app preserves it across in-place saves, renames, and moves, and regenerates it whenever an action creates a second live package: File > Duplicate, Save As or Save a Copy targeting a new location, and template instantiation. Save As or Save a Copy issued while a package's rows are still loading writes a faithful copy of the original bytes and keeps the original id — regeneration applies once the document is fully loaded. External byte-copies (Finder duplicates, iCloud/Dropbox conflict copies) can share an id. On open, Structable compares the materializing package with the currently open documents at positively distinct filesystem identities: an already-open document wins and the newcomer is re-keyed, with the fresh id persisting through the normal save flow. Two copies that are never open at the same time keep the shared id — recents-based repair is deliberately deferred because recents cannot prove which closed path was the historical source and probing them at open time can block on non-materialized cloud items. Symlink aliases to the same filesystem package do not collide.
+`documentId` is required and must be a UUID; a package without a valid one does not open. It is the package's stable identity key: App Intents entities resolve documents by it. The app preserves it across in-place saves, renames, and moves, and regenerates it whenever an action creates a second live package: File > Duplicate, Save As or Save a Copy targeting a new location, and template instantiation. Save As or Save a Copy issued while a package's rows are still loading writes a faithful copy of the original bytes and keeps the original id — regeneration applies once the document is fully loaded. External byte-copies (Finder duplicates, iCloud/Dropbox conflict copies) can share an id. On open, Structable compares the materializing package with the currently open documents at positively distinct filesystem identities: an already-open document wins and the newcomer is re-keyed, with the fresh id persisting through the normal save flow. Two copies that are never open at the same time keep the shared id. Symlink aliases to the same filesystem package do not collide.
 
 An App Intent entity's remembered package URL is a strict identity disambiguator, not a fallback hint. If headless materialization discovers a duplicate id, Structable durably saves the repair, rejects the stale entity without running its requested read or mutation, and returns the replacement id so the caller can refresh and retry. A later request carrying the old id and remembered URL remains a teaching error; it never falls through to a different package that still legitimately owns the old id.
 
-`rowArchetype` is optional document configuration for what one table row represents. `rowArchetype.singular` stores the singular label; empty or absent values are treated as the default `Row`. The optional `rowArchetype.plural` stores an explicit plural label; when absent, UI and detached tooling derive the plural from the singular at display time.
+`rowArchetype` is optional document configuration for what one table row represents. `rowArchetype.singular` stores the singular label; empty or absent values are treated as the default `Row`. The optional `rowArchetype.plural` stores an explicit plural label; when absent, the app and the Structable tool derive the plural from the singular at display time.
 
-`lastWriter` records which surface wrote the package most recently. The optional `lastWriter.recap` stores a one-line natural-language summary of that write; detached tooling persists it so optimistic-concurrency conflicts can report what the most recent write did.
+`lastWriter` records which surface wrote the package most recently. The optional `lastWriter.recap` stores a one-line natural-language summary of that write; the Structable tool persists it so optimistic-concurrency conflicts can report what the most recent write did.
 
 ### README.md
 
@@ -93,16 +93,16 @@ An App Intent entity's remembered package URL is a strict identity disambiguator
 ```
 
 - `views` array order is display order. There is no separate sort-order field.
-- `id` is stable across renames. Structable-created IDs are unique lowercase base-36 values; agents should round-trip IDs returned by `structable_describe` instead of deriving them from names.
+- `id` is any non-blank text, unique case-insensitively within the file, and stable across renames. Structable-created IDs are lowercase base-36 values; agents should round-trip IDs returned by `structable_describe` instead of deriving them from names.
 - `name` is trimmed, non-empty, and unique case-insensitively within the file. View names are user content and are never localized.
-- `rowFilterCombination` is `and` or `or`; when absent it defaults to `and`. `rowFilters` uses the same flat persisted shape and condition vocabulary as metric widget filters. Filter IDs should also be round-tripped to avoid unnecessary Git diffs. IDs must be unique within each view or metric, but can be reused across different views and metrics. CLI/MCP writes reject duplicate filter IDs before persisting any operation in the batch; omitted IDs for new filters receive fresh UUIDs.
+- `rowFilterCombination` is `and` or `or`; when absent it defaults to `and`. `rowFilters` uses the same flat persisted shape and condition vocabulary as metric filters. Filter IDs should also be round-tripped to avoid unnecessary Git diffs. IDs must be unique within each view or metric, but can be reused across different views and metrics. CLI/MCP writes reject duplicate filter IDs before persisting any operation in the batch; omitted IDs for new filters receive fresh UUIDs. Every filter ID must be a UUID; a view or metric with any other filter ID is skipped when the package loads.
 - `sort` is optional `{column, ascending}`. Its absence means Manual Order. `groupByColumn` is optional and may name only a Single Select, Rating, or Checkbox column. A view cannot sort and group by the same column; normalization keeps grouping and clears that sort.
 - `icon` is optional and names one glyph from the curated saved-view icon vocabulary: `list`, `checklist`, `calendar`, `clock`, `flag`, `star`, `tag`, `person`, `people`, `folder`, `tray`, `archive`, `warning`, `bolt`, `flame`, `bookmark`, `envelope`, `cart`, `dollar`, `chart`, `target`, `lightbulb`, `book`, `document`, `map`, `house`, `heart`, or `sparkles`. It is display only and carries no color. The key is written only when an icon is set, so pre-icon files round-trip unchanged. A missing key and an explicit `null` both mean no icon, and neither is reported. Any other value the vocabulary does not contain — an unknown string, or a value written with a non-string type — is removed during load normalization with a non-fatal load issue, and the cleaned file persists on the next save.
-- Column references use schema column names. A column rename rewrites saved-view references. Select-option renames through the app and detached tools also rewrite matching saved-view and metric filter operands before normalization. Missing or incompatible references and invalid filter operands are removed or cleared during load normalization, with a non-fatal load issue, and the repaired file is persisted on the next save. A stale saved view never blocks document open or a schema edit.
+- Column references use schema column names. A column rename rewrites saved-view references. Select-option renames through the app and the Structable tool also rewrite matching saved-view and metric filter operands before normalization. Missing or incompatible references and invalid filter operands are removed or cleared during load normalization, with a non-fatal load issue, and the repaired file is persisted on the next save. A stale saved view never blocks document open or a schema edit.
 - Blank or later duplicate IDs and blank, untrimmed, or case-insensitively duplicate names are repaired deterministically in array order. The first valid occurrence is preserved. Root-level and per-view unknown fields survive repair.
 - The whole file uses the Metrics JSON date-coding regime and pretty-printed, sorted keys. It is omitted when there are no views and no preserved root-level unknown keys.
 - A regular root file named `views.json` is Structable-managed. A pre-existing directory with that name is preserved and ignored as foreign content; it has no views fingerprint. Structable refuses a write that would have to destroy such a collision.
-- `structable_query` can apply a saved view by ID. Its filters are used instead of an inline filter, its sort is inherited only when the request omits `sort`, and its grouping is ignored because detached query output has no grouped presentation.
+- `structable_query` can apply a saved view by ID. Its filters are used instead of an inline filter, its sort is inherited only when the request omits `sort`, and its grouping is ignored because query output has no grouped presentation.
 
 ### schema.json
 
@@ -143,7 +143,9 @@ An App Intent entity's remembered package URL is a strict identity disambiguator
       "numberFormat": {
         "style": "currency",
         "currencyCode": "USD",
-        "decimals": 2
+        "decimals": 2,
+        "groupingSeparator": true,
+        "allowNegative": true
       }
     },
     {
@@ -163,6 +165,7 @@ An App Intent entity's remembered package URL is a strict identity disambiguator
 Canonical write-shape notes:
 
 - `schema.json` stays flat; type-specific configuration lives directly on each column object.
+- A supplied `numberFormat` is a complete definition: `style`, `decimals`, `groupingSeparator` and `allowNegative` are required; `currencyCode` is optional. To change one setting, copy the full saved definition and change that setting. Partial configuration updates are not supported.
 - select options are canonically written as objects using `id` and optional `color`
 - Structable still reads legacy string options, legacy `label` objects, and legacy `checkboxMode` for compatibility, but it does not write them back out in that shape
 
@@ -222,11 +225,11 @@ Metrics are stored outside `schema.json` under `Metrics/<metric-id>/` and use `c
 - text-like filters use `textContains`, `textDoesNotContain`, `textEquals`, `textNotEquals`, `textStartsWith`, `textEndsWith`, `textIsEmpty`, and `textIsNotEmpty`
 - number and progress filters use `numberEquals`, `numberNotEquals`, `numberGreaterThan`, `numberGreaterThanOrEqual`, `numberLessThan`, `numberLessThanOrEqual`, `numberBetween`, `numberIsEmpty`, and `numberIsNotEmpty`
 - multi-select filters use `multiSelectContainsAny`, `multiSelectContainsAll`, `multiSelectContainsNone`, `multiSelectIsEmpty`, and `multiSelectIsNotEmpty`
-- date filter `value`, `start`, and `end` accept both cell encodings on read: a calendar date such as `2026-07-04` or a full ISO 8601 instant. Metrics writers emit the same canonical UTC instant string, preserving milliseconds, across directory saves, file-wrapper saves, fingerprints, and detached metric/filter surfaces; surrounding JSON formatting is not part of that value-level guarantee
+- date filter `value`, `start`, and `end` accept both cell encodings on read: a calendar date such as `2026-07-04` or a full ISO 8601 instant. Metrics writers emit the same canonical UTC instant string, preserving milliseconds, across directory saves, file-wrapper saves, fingerprints, and the Structable tool's metric/filter surfaces; surrounding JSON formatting is not part of that value-level guarantee
 - `dateOn` matches the selected calendar day for date-only columns and the selected minute for date-time and timestamp columns
 - invalid widget row filters are normalized on load: missing columns, incompatible condition types, empty text operands, stale select options, empty select lists after cleanup, and out-of-range rating or progress values are removed, while reversed number/date `between` bounds are reordered. Stale cached widget data for affected widgets is discarded before recomputation
 - `Metrics/*/data.json` stores an optional last-known full-document derived cache and may be ignored or deleted safely; the app regenerates it. `resultChangedAt` records when that canonical full-document result last changed. Trend points and breakdown segments do not have persisted item IDs. Breakdown widget caches are display-ready and collapse more than 8 groups into the top 7 groups plus an `Other`. Other applies the selected function to the overflow categories' underlying values. Count counts category memberships; numeric functions ignore empty values.
-- when a document window scopes inspector metrics to its applied table filter/search result, those values are a transient in-memory presentation overlay. They never enter `Metrics/*/data.json`, the canonical metrics cache, dirty state, save snapshots, or detached agent surfaces
+- when a document window scopes inspector metrics to its applied table filter/search result, those values are a transient in-memory presentation overlay. They never enter `Metrics/*/data.json`, the canonical metrics cache, dirty state, save snapshots, or the Structable tool's output
 
 ### CSV Encoding Rules
 
@@ -235,12 +238,12 @@ Metrics are stored outside `schema.json` under `Metrics/<metric-id>/` and use `c
 - first row is the header, required even for an empty table; a zero-byte or BOM-only file is invalid
 - records wider than the schema columns plus `ID` are rejected before rows become live; shorter records retain empty trailing values and deterministically repair an omitted ID
 - CSV row order is the canonical manual order
-- stable row identity is persisted through a trailing `ID` column in `data.csv`
+- stable row identity is persisted through a trailing `ID` column in `data.csv`. An ID is lowercase letters and digits only, unique in the document, such as `mngfz756` or `task001`. Structable makes new IDs from the current time in milliseconds, written in base 36. Capitals are lowercased on load, but a document does not open if a row with capitals has a rowdoc; an ID with any other character is replaced by a new one (note 9)
 - headers in `data.csv` must follow `schema.json` column order, then `ID`, and match column names case-insensitively
 - the row-number column is UI-only, always shown at visual column 0, and is never persisted to `data.csv`
 - optional `manifest.json.rowArchetype.singular` stores the singular row label, such as `Contact`; blank or absent means `Row`; optional `rowArchetype.plural` overrides the derived plural
 - `ID` is a reserved public system field, not a schema column
-- date columns whose format omits time store calendar dates as date-only ISO 8601 (`YYYY-MM-DD`); v1 supports Gregorian years `1583...9999`, beginning with the first full year after the native system calendar's historical cutover so package validation, rendering, editing, filtering, and metrics share one calendar interpretation. ISO-looking values outside that range remain text after normal surrounding-space trimming on package load and are rejected by strict agent writes. A supported calendar date is timezone-independent and canonically the UTC midnight of its day, so the same file names the same day on every machine
+- date columns whose format omits time store calendar dates as date-only ISO 8601 (`YYYY-MM-DD`); Structable supports Gregorian years `1583...9999`, beginning with the first full year after the native system calendar's historical cutover so package validation, rendering, editing, filtering, and metrics share one calendar interpretation. ISO-looking values outside that range remain text after normal surrounding-space trimming on package load and are rejected by strict agent writes. A supported calendar date is timezone-independent and canonically the UTC midnight of its day, so the same file names the same day on every machine
 - date columns whose format includes time, and timestamp columns, canonically write UTC-normalizable ISO 8601 instants in the form `YYYY-MM-DDTHH:MM:SS[.fraction](Z|z|signHH|signHH:MM|signHHMM)`, where `sign` is `+` or `-`; strict agent writes reject date-only input for these columns, while native package reads accept legacy `YYYY-MM-DD` values as UTC midnight and canonicalize them to a full instant on the next write. Both the written civil year and normalized UTC year must remain in `1583...9999`
 - instant fractions are persisted canonically at millisecond precision: one or more fractional digits are accepted, digits beyond the first three are intentionally truncated on intake, trailing zeroes are omitted on write, and integral-second values retain the `...:SSZ` form
 - migration is lenient-read plus canonicalize-on-write: an exact UTC-midnight value in a day-granularity date column remains that canonical day; a full instant with an explicit numeric UTC offset preserves the `YYYY-MM-DD` day written in that offset; other legacy full instants (notably historical picker values serialized with `Z`) use the migration process's current timezone when the instant is local midnight there, otherwise they fall back to the nearest UTC day. The value is rewritten date-only on the next save. This recovers local-midnight picker writes across fractional offsets, DST, and UTC+14 in the writer's timezone while preserving the established result for most packages moved between timezones. A non-midnight `Z` instant carries no writer-timezone metadata, so moved legacy values beyond UTC+12 remain inherently ambiguous until canonicalized.
@@ -250,7 +253,7 @@ Metrics are stored outside `schema.json` under `Metrics/<metric-id>/` and use `c
 - progress values are stored as raw decimals in `0...1`
 - progress persistence/import parsing is locale-neutral and never strips commas; an ambiguous value such as `0,1` stays text instead of becoming `1`. Human-facing filter input separately accepts the current locale's decimal separator and percent symbol.
 - native `data.csv` date parsing is locale-neutral: non-ISO localized text stays text instead of changing meaning between machines. The explicit user-facing foreign CSV import flow may additionally interpret dates using the current locale, but localized results must remain within both UTC persistence bounds and the displayed civil-year bounds. Human-facing instant pickers use the same intersection so extreme offsets cannot display year 1582 or 10000. Day-only pickers instead bind directly to canonical UTC-midnight dates across the full `1583-01-01...9999-12-31` range, including civil days skipped by a local timezone.
-- rowdoc columns store package-relative `.md` paths such as `Rowdocs/Notes/<row-id>.md`
+- rowdoc columns store package-relative `.md` paths such as `Rowdocs/Notes/<row-id>.md`; the file name must be the row's `ID` exactly
 - multi-select values use `|` as the delimiter, escaping literal `\` as `\\` and literal `|` as `\|`
 - standard CSV escaping rules apply: quote fields containing commas, quotes, or line breaks, and double embedded quotes
 
@@ -265,18 +268,20 @@ Metrics are stored outside `schema.json` under `Metrics/<metric-id>/` and use `c
 7. **Document descriptions are README-backed** - the optional root `README.md` stores user-authored package purpose/context and is removed when blank.
 8. **Rowdoc bodies are file-backed** - populated `rowdoc` cells keep their markdown bodies in `Rowdocs/<Column>/<RowID>.md`, while `data.csv` stores only the relative reference path. A zero-length body file with a live reference is a valid state, distinct from an unpopulated cell.
 9. **Row IDs and their rowdoc references are repaired within the native format** - if the `ID` column is present but a row ID is omitted, blank, duplicated, invalid, or requires normalization, Structable repairs it on load. Each repaired row's populated `rowdoc` cells with unambiguous package-path spelling are canonicalized to `Rowdocs/<Column>/<RowID>.md`; references in rows whose IDs did not change are left alone. The next write persists the row repair and copies the exact referenced source bytes to each canonical target, including when multiple repaired cells shared one source. Migration planning retains every raw Unicode spelling through collision validation and rejects a missing or invalid source, an already occupied target (including one owned by an unchanged row), or case- or Unicode-equivalent source, target, or final reference components with different spellings before persistence mutation, leaving package bytes unchanged for manual correction.
-10. **Agent-surface writes validate strictly** - imports into an existing schema reject unknown headers, duplicate case-insensitive destinations (including `ID`), and surplus unmapped fields before mutation. Row-write objects reject duplicate case-insensitive keys. Detached tool row writes and delimited imports reject values that do not match the column's stated encoding (teaching errors instead of coercion), match select values case-insensitively against option IDs persisting the canonical ID, and auto-create unknown select options with an assigned color, reporting them in the write result's `createdOptions`. Day-granularity date columns accept only calendar dates like `2026-07-04`; a time-bearing ISO 8601 value is rejected with a teaching error naming the calendar-date encoding, while date columns that include time and timestamp writes accept the strict instant grammar above. Load-time parsing of hand-edited files is locale-neutral: invalid or non-ISO date/timestamp values remain text after normal surrounding-space trimming instead of being coerced, and unknown select options in `data.csv` are cleared when the package loads, so direct file edits must add options to `schema.json` first. Number and progress cells read leniently but full-string: US-grouped (`1,234.56`), currency-prefixed, exponent, and percent forms are accepted whole — a percent string like `50%` reads as its semantic value `0.5` — and an unparseable value remains text after the same normalization instead of being truncated or dropped.
+10. **Agent-surface writes validate strictly** - imports into an existing schema reject unknown headers, duplicate case-insensitive destinations (including `ID`), and surplus unmapped fields before mutation. Row-write objects reject duplicate case-insensitive keys. The Structable tool's row writes and delimited imports reject values that do not match the column's stated encoding (teaching errors instead of coercion), match select values case-insensitively against option IDs, and persist the canonical ID. JSON row writes (create, add and update) reject unknown select options before saving; the error lists valid options and may suggest a close match without applying it. To create an option intentionally, add it to the column first with the `add_option` column action. Delimited imports create unknown options with assigned colors and report them in `createdOptions`. Day-granularity date columns accept only calendar dates like `2026-07-04`; a time-bearing ISO 8601 value is rejected with a teaching error naming the calendar-date encoding, while date columns that include time and timestamp writes accept the strict instant grammar above. Load-time parsing of hand-edited files is locale-neutral: invalid or non-ISO date/timestamp values remain text after normal surrounding-space trimming instead of being coerced, and unknown select options in `data.csv` are cleared when the package loads, so direct file edits must add options to `schema.json` first. Number and progress cells read leniently but full-string: US-grouped (`1,234.56`), currency-prefixed, exponent, and percent forms are accepted whole — a percent string like `50%` reads as its semantic value `0.5` — and an unparseable value remains text after the same normalization instead of being truncated or dropped.
+
+JSON row inputs also accept native numbers for number, progress and rating columns, and native booleans for checkbox columns. Native numbers must have at most 15 significant decimal digits, magnitude at most 9007199254740991, and an exact decimal round trip through the transport and decimal storage; scientific notation is normalized to plain decimal text. Values outside that policy must use quoted plain decimal strings. Column ranges still apply; numbers and booleans are not coerced into text, select or date columns. Strings follow the encoding rules above, null writes an empty cell, and `data.csv` stores the same text whichever form a value arrives in.
 
 ### Format Versioning & Compatibility
 
-`manifest.json.version` carries the package format version as semantic versioning. The current writable format is **2.0.0** (`StructableCompatibility.latestWritableVersion`).
+`manifest.json.version` carries the package format version as semantic versioning. The current writable format is **2.0.0**.
 
 Readable band:
 
-- Structable reads packages whose version has major `2` and a minor in the supported readable set (`StructableCompatibility.readableMinorVersions`, currently just `0`); the patch component is ignored, so the readable band is `2.0.x`
-- packages outside the band are rejected at the read boundary with a teaching error naming the supported formats; a `1.2.x` package also receives a pointer to the temporary `Scripts/convert-rowdocs.py` conversion script
+- Structable reads packages whose version has major `2` and minor `0`; the patch component is ignored, so the readable band is `2.0.x`
+- packages outside the band are rejected at the read boundary with a teaching error naming the supported formats
 - the reader does not migrate older packages; format 2.0 changes the stored column type to `rowdoc` and the body folder to `Rowdocs/`
-- every save pins `manifest.json.version` back to the latest writable version (`Manifest.prepareForWrite`), regardless of which 2.0.x patch the package carried on load
+- every save pins `manifest.json.version` back to the latest writable version, regardless of which 2.0.x patch the package carried on load
 
 Version-bump rules:
 
@@ -331,7 +336,7 @@ Unknown-key preservation:
 ### Column Editing Rules
 
 - users choose a column type when creating a new column
-- in the initial release, existing columns keep their type after creation; changing type requires creating a new column instead
+- existing columns keep their type after creation; changing type requires creating a new column instead
 
 ### Number Formatting
 
@@ -357,6 +362,7 @@ Number styling is display-only. CSV storage remains plain decimal text even when
 
 - `Metrics/*/config.json` is the canonical widget file; `Metrics/*/data.json` is an optional last-known full-document derived cache with `resultChangedAt` and semantic metric values only
 - `widgetType` uses `stat`, `trend`, or `breakdown`
+- `sortOrder` is an integer; metrics are listed in ascending `sortOrder`
 - `colorTheme`, `statConfig.function`, `trendConfig.function`, `trendConfig.resamplingPeriod`, `breakdownConfig.function`, `rowFilterCombination`, `rowFilters[].condition.type`, and `rowFilters[].condition.range` all persist app-defined raw enum strings
 - widget configs stay document-specific, but they do not alter the `schema.json` contract
 
