@@ -37,6 +37,4 @@ The specification and this README are licensed under the [Creative Commons Attri
 
 Copyright 2026 Cynapse Technologies Inc.
 
-Structable is made by Cynapse.
-
-Structable is a trademark of Cynapse.
+Structable is a Cynapse invention
